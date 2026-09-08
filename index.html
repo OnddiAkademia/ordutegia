@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="eu">
+<head>
+    <meta charset="UTF-8">
+    <title>Akademia Onddi - Ordutegia</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        h2 { text-align: center; color: #2c3e50; }
+        .instructions { text-align: center; margin-bottom: 15px; font-size: 0.95em; color: #555; }
+        .actions { text-align: center; margin-bottom: 20px; }
+        .action-btn {
+            background-color: #38a169; color: white; border: none; padding: 10px 15px; margin: 5px;
+            font-size: 0.95em; font-weight: bold; border-radius: 5px; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .action-btn:hover { background-color: #2f855a; }
+        .action-btn.load { background-color: #d69e2e; }
+        .action-btn.load:hover { background-color: #b7791f; }
+        .action-btn.pdf { background-color: #3182ce; }
+        .action-btn.pdf:hover { background-color: #2b6cb0; }
+        .action-btn.clear { background-color: #e53e3e; }
+        .action-btn.clear:hover { background-color: #c53030; }
+        .action-btn.image-mode { background-color: #805ad5; }
+        .action-btn.image-mode:hover { background-color: #6b46c1; }
+
+        table { border-collapse: collapse; width: 100%; background-color: #fff; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #cbd5e0; padding: 5px; text-align: center; vertical-align: top; min-width: 80px; }
+        th { background-color: #e2e8f0; font-weight: 600; }
+        .time-col { width: 60px; font-weight: bold; background-color: #edf2f7; vertical-align: middle; }
+        .sub-col { font-size: 0.85em; color: #4a5568; background-color: #f7fafc; }
+        .cell { height: 20px; cursor: pointer; transition: background 0.2s; position: relative; }
+        .cell:hover:not(.active-class) { background-color: #e6fffa; }
+        
+        .active-class { cursor: default; }
+        .class-header { font-weight: bold; font-size: 0.85em; margin-bottom: 5px; color: rgba(0,0,0,0.7); }
+        
+        /* Kolore dinamikoak ikasle kopuruaren arabera */
+        .c-blue { background-color: #ebf8ff; border: 2px solid #3182ce; }       /* 0 ikasle */
+        .c-green { background-color: #c6f6d5; border: 2px solid #38a169; }      /* 1 ikasle */
+        .c-orange { background-color: #feebc8; border: 2px solid #dd6b20; }     /* 2 edo 3 ikasle */
+        .c-red { background-color: #fed7d7; border: 2px solid #e53e3e; }        /* 4 ikasle */
+        .c-darkred { background-color: #fc8181; border: 2px solid #c53030; }    /* 5 ikasle */
+
+        .student-list { list-style-type: none; padding: 0; margin: 5px 0; font-size: 0.8em; text-align: left; }
+        .student-list li { background: rgba(255,255,255,0.7); margin-bottom: 3px; padding: 3px 5px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
+        .delete-btn { color: #e53e3e; cursor: pointer; font-weight: bold; padding: 0 4px; }
+        .delete-btn:hover { background-color: #fed7d7; border-radius: 50%; }
+        button.inner-btn { background-color: #4299e1; color: white; border: none; border-radius: 3px; padding: 4px 8px; font-size: 0.75em; cursor: pointer; width: 100%; margin-top: 5px; }
+        button.inner-btn:hover { background-color: #3182ce; }
+        .delete-class-btn { background-color: #e53e3e !important; }
+        .delete-class-btn:hover { background-color: #c53030 !important; }
+        
+        #auto-save-status {
+            text-align: center; font-size: 0.85em; color: #718096; margin-top: -10px; margin-bottom: 15px; height: 15px;
+        }
+
+        /* IRUDI MODUA (Pantaila-argazkia ateratzeko) */
+        body.irudi-modua .student-list li span:first-child { color: transparent; } /* Izenak ezkutatu */
+        body.irudi-modua .delete-btn { display: none; }
+        body.irudi-modua .inner-btn { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <h2>AKADEMIA ONDDI - ORDUTEGIA 2026-27</h2>
+    <div id="auto-save-status"></div>
+    
+    <div class="actions">
+        <button class="action-btn image-mode" onclick="toggleIrudiModua()">📷 Irudi Modua</button>
+        <button class="action-btn" onclick="gordeFitxategia()">💾 Esportatu (.json)</button>
+        <button class="action-btn load" onclick="kargatuFitxategia()">📂 Inportatu</button>
+        <button class="action-btn pdf" onclick="esportatuPDF()">📄 Esportatu PDF</button>
+        <button class="action-btn clear" onclick="garbituTaula(true)">🗑️ Garbitu Taula</button>
+    </div>
+
+    <table id="horario">
+        <thead>
+            <tr>
+                <th rowspan="2">Ordua</th>
+                <th colspan="2">Astelehena</th>
+                <th colspan="2">Asteartea</th>
+                <th colspan="2">Asteazkena</th>
+                <th colspan="2">Osteguna</th>
+                <th colspan="2">Ostirala</th>
+            </tr>
+            <tr>
+                <th class="sub-col">1:30h</th><th class="sub-col">1h</th>
+                <th class="sub-col">1:30h</th><th class="sub-col">1h</th>
+                <th class="sub-col">1:30h</th><th class="sub-col">1h</th>
+                <th class="sub-col">1:30h</th><th class="sub-col">1h</th>
+                <th class="sub-col">1:30h</th><th class="sub-col">1h</th>
+            </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+    </table>
+
+    <script>
+        const tbody = document.getElementById('tbody');
+        const times = [];
+        const egunak = ['Astelehena', 'Asteartea', 'Asteazkena', 'Osteguna', 'Ostirala'];
+        
+        // Ordutegi lehenetsia (JSON eguneratua)
+        const defaultDatuak = [
+            {"row":"0","day":"2","col":"0","ikasleak":["Adibidea"]},
+            {"row":"0","day":"4","col":"0","ikasleak":["Naroa Ascension"]},
+            {"row":"1","day":"0","col":"0","ikasleak":["Urko Ortega"]},
+            {"row":"1","day":"1","col":"0","ikasleak":["Jaitz Zubillaga","Ximon Garin"]},
+            {"row":"1","day":"3","col":"0","ikasleak":["Inhar Iruretagoyena","Xare Peñagarikano","Anika","Jaitz Zubillaga"]},
+            {"row":"3","day":"0","col":"1","ikasleak":["Markel Rodriguez","Izaro Arnaiz","Ixabel Garin"]},
+            {"row":"3","day":"1","col":"1","ikasleak":["Izaro Arnaiz","Maialen Aizpurua"]},
+            {"row":"3","day":"2","col":"1","ikasleak":["Adibidea"]},
+            {"row":"3","day":"3","col":"1","ikasleak":["Izaro Arnaiz","June"]},
+            {"row":"3","day":"4","col":"1","ikasleak":["Irene Cortés"]},
+            {"row":"6","day":"2","col":"0","ikasleak":["Julen Torres","Xuban Morras","Hegoa Balda","Maren Goñi"]},
+            {"row":"6","day":"4","col":"0","ikasleak":["Adibidea"]},
+            {"row":"7","day":"0","col":"0","ikasleak":["Nahia Altuna","Hegoa Balda","Maren Goñi"]},
+            {"row":"7","day":"0","col":"1","ikasleak":["Ibai Lamuedra","Izan Vicente"]},
+            {"row":"7","day":"1","col":"0","ikasleak":["Xuban Morras"]},
+            {"row":"7","day":"1","col":"1","ikasleak":["Lur Rodriguez","Ibai López"]},
+            {"row":"7","day":"2","col":"1","ikasleak":["Iñigo Manso","Izan Vicente"]},
+            {"row":"7","day":"3","col":"0","ikasleak":["Yaiza Rosco","Iraia Herrero"]},
+            {"row":"7","day":"3","col":"1","ikasleak":["Ibai López"]},
+            {"row":"7","day":"4","col":"1","ikasleak":["Adibidea"]},
+            {"row":"11","day":"0","col":"1","ikasleak":["Unai Etxabe"]},
+            {"row":"11","day":"1","col":"1","ikasleak":["Adibidea"]},
+            {"row":"11","day":"2","col":"1","ikasleak":["Unai Etxabe"]},
+            {"row":"11","day":"3","col":"1","ikasleak":["Adibidea"]},
+            {"row":"12","day":"2","col":"0","ikasleak":["Adibidea","Adibidea","Adibidea","Adibidea"]},
+            {"row":"13","day":"0","col":"0","ikasleak":["Yaiza Rosco","Iraia Herrero"]},
+            {"row":"13","day":"1","col":"0","ikasleak":["Naroa Ascension","Nahia Uria"]},
+            {"row":"13","day":"3","col":"0","ikasleak":["Julen Torres","Nahia Uria"]},
+            {"row":"15","day":"0","col":"1","ikasleak":["Irene Cortés"]},
+            {"row":"15","day":"1","col":"1","ikasleak":["Adibidea"]},
+            {"row":"15","day":"2","col":"1","ikasleak":["Irene Cortés"]},
+            {"row":"15","day":"3","col":"1","ikasleak":["Adibidea"]}
+        ];
+        
+        let h = 15, m = 15;
+        while(h < 20) {
+            let timeStr = h.toString().padStart(2, '0') + ':' + m.toString().padStart(2, '0');
+            times.push(timeStr);
+            m += 15;
+            if(m === 60) { h++; m = 0; }
+        }
+        const totalRows = times.length;
+
+        // Taula eraiki
+        for (let r = 0; r < totalRows; r++) {
+            const tr = document.createElement('tr');
+            const tdTime = document.createElement('td');
+            tdTime.className = 'time-col';
+            tdTime.textContent = times[r];
+            tr.appendChild(tdTime);
+
+            for (let d = 0; d < 5; d++) {
+                for (let c = 0; c < 2; c++) {
+                    const td = document.createElement('td');
+                    td.className = 'cell';
+                    td.dataset.row = r;
+                    td.dataset.day = d;
+                    td.dataset.col = c;
+                    tr.appendChild(td);
+                }
+            }
+            tbody.appendChild(tr);
+        }
+
+        // --- KOLOREAK EGUNERATZEKO FUNTZIOA ---
+        function eguneratuKoloreak() {
+            document.querySelectorAll('.active-class').forEach(cell => {
+                const ikasleKop = cell.querySelectorAll('.student-list li').length;
+                cell.classList.remove('c-blue', 'c-green', 'c-orange', 'c-red', 'c-darkred');
+                
+                if (ikasleKop === 1) cell.classList.add('c-green');
+                else if (ikasleKop === 2 || ikasleKop === 3) cell.classList.add('c-orange');
+                else if (ikasleKop === 4) cell.classList.add('c-red');
+                else if (ikasleKop === 5) cell.classList.add('c-darkred');
+                else cell.classList.add('c-blue');
+            });
+        }
+
+        // --- IRUDI MODUA ---
+        function toggleIrudiModua() {
+            document.body.classList.toggle('irudi-modua');
+        }
+
+        // --- AUTOGUARDADO ---
+        function gordeDatuakLokalean() {
+            const klaseak = [];
+            const aktiboak = document.querySelectorAll('.active-class');
+            aktiboak.forEach(cell => {
+                const ikasleak = [];
+                const izenak = cell.querySelectorAll('.student-list li span:first-child');
+                izenak.forEach(span => ikasleak.push(span.textContent));
+                klaseak.push({
+                    row: cell.dataset.row,
+                    day: cell.dataset.day,
+                    col: cell.dataset.col,
+                    ikasleak: ikasleak
+                });
+            });
+            localStorage.setItem('onddi_ordutegia_data', JSON.stringify(klaseak));
+            
+            const status = document.getElementById('auto-save-status');
+            const ordua = new Date().toLocaleTimeString();
+            status.textContent = `Aldaketak automatikoki gorde dira nabigatzailean (${ordua})`;
+            setTimeout(() => { status.textContent = ''; }, 3000);
+            
+            eguneratuKoloreak();
+        }
+
+        function kargatuDatuakLokalean() {
+            const datuakStr = localStorage.getItem('onddi_ordutegia_data');
+            let klaseakKargatzeko = [];
+            
+            if (datuakStr) {
+                try {
+                    klaseakKargatzeko = JSON.parse(datuakStr);
+                } catch(e) { 
+                    klaseakKargatzeko = defaultDatuak;
+                }
+            } else {
+                klaseakKargatzeko = defaultDatuak;
+            }
+
+            garbituTaula(false, false); 
+            klaseakKargatzeko.forEach(klase => {
+                const r = parseInt(klase.row);
+                const d = parseInt(klase.day);
+                const c = parseInt(klase.col);
+                const cell = tbody.querySelector(`td[data-row="${r}"][data-day="${d}"][data-col="${c}"]`);
+                if(cell && sortuKlasea(cell, r, d, c)) {
+                    const ul = cell.querySelector('.student-list');
+                    klase.ikasleak.forEach(izen => {
+                        const li = document.createElement('li');
+                        li.innerHTML = `<span>${izen}</span> <span class="delete-btn" title="Ikaslea ezabatu">×</span>`;
+                        ul.appendChild(li);
+                    });
+                }
+            });
+            
+            eguneratuKoloreak();
+            // Inportantea: Lokalean ezer ez badago, kargatutako datu lehenetsiak automatikoki gorde
+            if (!datuakStr) gordeDatuakLokalean();
+        }
+        
+        window.addEventListener('DOMContentLoaded', kargatuDatuakLokalean);
+
+        // --- LOGIKA BIZIA ---
+        function sortuKlasea(cell, r, d, c) {
+            const span = (c === 0) ? 6 : 4; 
+            if (r + span > totalRows) {
+                alert('Klasearen iraupena ixteko ordua (20:00) baino beranduago amaitzen da.');
+                return false;
+            }
+            let cellsToHide = [];
+            for (let i = 1; i < span; i++) {
+                const nextRow = tbody.children[r + i];
+                const nextCell = nextRow.querySelector(`td[data-day="${d}"][data-col="${c}"]`);
+                if (nextCell.classList.contains('active-class') || nextCell.style.display === 'none') {
+                    alert('Ordutegi hau existitzen den beste klase batekin gainjartzen da.');
+                    return false;
+                }
+                cellsToHide.push(nextCell);
+            }
+            cell.classList.add('active-class');
+            cell.rowSpan = span;
+            cellsToHide.forEach(cel => cel.style.display = 'none');
+            cell.innerHTML = `
+                <div class="class-header">${c===0 ? '1:30h' : '1h'} Klasea</div>
+                <ul class="student-list"></ul>
+                <button class="inner-btn add-btn">+ Ikaslea Gehitu</button>
+                <button class="inner-btn delete-class-btn">Klasea Ezabatu</button>
+            `;
+            return true;
+        }
+
+        function kenduKlasea(cell, r, d, c) {
+            const span = (c === 0) ? 6 : 4;
+            cell.classList.remove('active-class', 'c-blue', 'c-green', 'c-orange', 'c-red', 'c-darkred');
+            cell.rowSpan = 1;
+            cell.innerHTML = '';
+            for (let i = 1; i < span; i++) {
+                const nextRow = tbody.children[r + i];
+                const nextCell = nextRow.querySelector(`td[data-day="${d}"][data-col="${c}"]`);
+                if(nextCell) nextCell.style.display = '';
+            }
+        }
+
+        tbody.addEventListener('click', function(e) {
+            const cell = e.target.closest('td.cell');
+            if (!cell) return;
+            if (['button', 'span', 'li'].includes(e.target.tagName.toLowerCase())) return;
+            if (cell.classList.contains('active-class')) return;
+
+            if(sortuKlasea(cell, parseInt(cell.dataset.row), parseInt(cell.dataset.day), parseInt(cell.dataset.col))) {
+                gordeDatuakLokalean();
+            }
+        });
+
+        tbody.addEventListener('click', function(e) {
+            if (e.target.classList.contains('add-btn')) {
+                const ul = e.target.previousElementSibling;
+                if (ul.children.length >= 5) {
+                    alert('Gehienez 5 ikasle onartzen dira klase bakoitzean.');
+                    return;
+                }
+                const name = prompt('Sartu ikaslearen izena:');
+                if (name && name.trim() !== '') {
+                    const li = document.createElement('li');
+                    li.innerHTML = `<span>${name}</span> <span class="delete-btn" title="Ikaslea ezabatu">×</span>`;
+                    ul.appendChild(li);
+                    gordeDatuakLokalean();
+                }
+            }
+            else if (e.target.classList.contains('delete-btn')) {
+                e.target.closest('li').remove();
+                gordeDatuakLokalean();
+            }
+            else if (e.target.classList.contains('delete-class-btn')) {
+                if(confirm('Ziur zaude klase hau ezabatu nahi duzula?')) {
+                    const cell = e.target.closest('td.cell');
+                    kenduKlasea(cell, parseInt(cell.dataset.row), parseInt(cell.dataset.day), parseInt(cell.dataset.col));
+                    gordeDatuakLokalean();
+                }
+            }
+        });
+
+        // --- ESPORTATU ETA INPORTATU FITXATEGIAK ---
+        function gordeFitxategia() {
+            const datuak = localStorage.getItem('onddi_ordutegia_data') || '[]';
+            const blob = new Blob([datuak], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'onddi_ordutegia_2627.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function kargatuFitxategia() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.json';
+            input.onchange = e => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = event => {
+                    try {
+                        localStorage.setItem('onddi_ordutegia_data', event.target.result);
+                        kargatuDatuakLokalean();
+                        alert('Fitxategia ondo kargatu da!');
+                    } catch (err) { alert('Errorea: Fitxategia ez da baliozkoa.'); }
+                };
+                reader.readAsText(file);
+            };
+            input.click();
+        }
+
+        function garbituTaula(abisuarekin, gorde = true) {
+            if (abisuarekin && !confirm('Ziur zaude taula osoa garbitu nahi duzula? Aldaketak ezin dira desegin.')) return;
+            const aktiboak = document.querySelectorAll('.active-class');
+            aktiboak.forEach(cell => {
+                kenduKlasea(cell, parseInt(cell.dataset.row), parseInt(cell.dataset.day), parseInt(cell.dataset.col));
+            });
+            if (abisuarekin) {
+                // Taula eskuz garbitzen bada, lokalean ere garbitu behar da (hutsik gorde)
+                localStorage.setItem('onddi_ordutegia_data', '[]');
+            } else if (gorde) {
+                gordeDatuakLokalean();
+            }
+        }
+
+        // --- PDF ESPORTAZIOA ---
+        function esportatuPDF() {
+            const kontainerra = document.createElement('div');
+            kontainerra.style.padding = '15px';
+            kontainerra.style.fontFamily = 'sans-serif';
+            kontainerra.style.color = '#333';
+
+            const izenburua = document.createElement('h2');
+            izenburua.textContent = 'Akademia Onddi - Ordutegia 2026-27';
+            izenburua.style.textAlign = 'center';
+            izenburua.style.marginBottom = '20px';
+            kontainerra.appendChild(izenburua);
+
+            const taulaKlonatua = document.getElementById('horario').cloneNode(true);
+            taulaKlonatua.style.width = '100%';
+            taulaKlonatua.style.borderCollapse = 'collapse';
+            taulaKlonatua.style.fontSize = '12px';
+            
+            taulaKlonatua.querySelectorAll('th, td').forEach(el => {
+                el.style.border = '1px solid #cbd5e0';
+                el.style.padding = '4px';
+                el.style.textAlign = 'center';
+            });
+            taulaKlonatua.querySelectorAll('th').forEach(el => { el.style.backgroundColor = '#e2e8f0'; });
+            taulaKlonatua.querySelectorAll('.inner-btn').forEach(btn => btn.remove());
+            taulaKlonatua.querySelectorAll('.delete-btn').forEach(btn => btn.remove());
+
+            taulaKlonatua.querySelectorAll('.active-class').forEach(cell => {
+                cell.querySelectorAll('li').forEach(li => {
+                    li.style.border = 'none'; li.style.background = 'transparent';
+                    li.style.padding = '1px 0'; li.style.marginBottom = '0'; li.style.justifyContent = 'center';
+                });
+            });
+            kontainerra.appendChild(taulaKlonatua);
+
+            const ikasleIzenburua = document.createElement('h3');
+            ikasleIzenburua.textContent = 'Ikasleen Zerrenda (Ordu kopuruaren arabera ordenatuta)';
+            ikasleIzenburua.style.marginTop = '30px'; ikasleIzenburua.style.borderBottom = '1px solid #ccc';
+            ikasleIzenburua.style.paddingBottom = '5px';
+            kontainerra.appendChild(ikasleIzenburua);
+
+            let ikasleDatuak = {}; 
+            const aktiboak = document.querySelectorAll('.active-class');
+            aktiboak.forEach(cell => {
+                 const r = parseInt(cell.dataset.row); const d = parseInt(cell.dataset.day); const c = parseInt(cell.dataset.col);
+                 const span = (c === 0) ? 6 : 4; const minutuak = (c === 0) ? 90 : 60; 
+                 const hasieraOrdua = times[r];
+                 const amaieraOrdua = (r + span < times.length) ? times[r + span] : '20:00'; 
+                 const ordutegiTestua = `${egunak[d]} (${hasieraOrdua} - ${amaieraOrdua})`;
+                 
+                 cell.querySelectorAll('.student-list li span:first-child').forEach(spanNode => {
+                      const izena = spanNode.textContent.trim();
+                      if (!ikasleDatuak[izena]) ikasleDatuak[izena] = { ordutegiak: [], minutuGuztira: 0 };
+                      ikasleDatuak[izena].ordutegiak.push(ordutegiTestua);
+                      ikasleDatuak[izena].minutuGuztira += minutuak;
+                 });
+            });
+
+            const ulList = document.createElement('ul');
+            ulList.style.listStyleType = 'none'; ulList.style.padding = '0'; ulList.style.fontSize = '14px';
+
+            const ikasleIzenak = Object.keys(ikasleDatuak).sort((a, b) => {
+                const aldea = ikasleDatuak[b].minutuGuztira - ikasleDatuak[a].minutuGuztira;
+                if (aldea !== 0) return aldea;
+                return a.localeCompare(b);
+            });
+
+            if(ikasleIzenak.length === 0) ulList.innerHTML = '<li>Ez dago ikaslerik erregistratuta ordutegi honetan.</li>';
+            else {
+                ikasleIzenak.forEach(izena => {
+                    const datuak = ikasleDatuak[izena];
+                    const orduak = datuak.minutuGuztira / 60;
+                    const li = document.createElement('li');
+                    li.style.marginBottom = '6px';
+                    li.innerHTML = `<strong>${izena} (${orduak} ordu):</strong> ${datuak.ordutegiak.join(' | ')}`;
+                    ulList.appendChild(li);
+                });
+            }
+            kontainerra.appendChild(ulList);
+
+            html2pdf().set({
+              margin: 10, filename: 'onddi_ordutegia_2627.pdf', image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+            }).from(kontainerra).save();
+        }
+    </script>
+</body>
+</html>
