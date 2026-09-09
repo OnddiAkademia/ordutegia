@@ -39,12 +39,11 @@
         .active-class { cursor: default; }
         .class-header { font-weight: bold; font-size: 0.85em; margin-bottom: 5px; color: rgba(0,0,0,0.7); }
         
-        /* Kolore dinamikoak ikasle kopuruaren arabera */
-        .c-blue { background-color: #ebf8ff; border: 2px solid #3182ce; }       /* 0 ikasle */
-        .c-green { background-color: #c6f6d5; border: 2px solid #38a169; }      /* 1 ikasle */
-        .c-orange { background-color: #feebc8; border: 2px solid #dd6b20; }     /* 2 edo 3 ikasle */
-        .c-red { background-color: #fed7d7; border: 2px solid #e53e3e; }        /* 4 ikasle */
-        .c-darkred { background-color: #fc8181; border: 2px solid #c53030; }    /* 5 ikasle */
+        .c-blue { background-color: #ebf8ff; border: 2px solid #3182ce; }
+        .c-green { background-color: #c6f6d5; border: 2px solid #38a169; }
+        .c-orange { background-color: #feebc8; border: 2px solid #dd6b20; }
+        .c-red { background-color: #fed7d7; border: 2px solid #e53e3e; }
+        .c-darkred { background-color: #fc8181; border: 2px solid #c53030; }
 
         .student-list { list-style-type: none; padding: 0; margin: 5px 0; font-size: 0.8em; text-align: left; }
         .student-list li { background: rgba(255,255,255,0.7); margin-bottom: 3px; padding: 3px 5px; border-radius: 3px; border: 1px solid rgba(0,0,0,0.1); display: flex; justify-content: space-between; align-items: center; }
@@ -57,9 +56,9 @@
         
         #auto-save-status {
             text-align: center; font-size: 0.85em; color: #718096; margin-top: -10px; margin-bottom: 15px; height: 15px;
+            font-weight: bold;
         }
 
-        /* IRUDI MODUA */
         body.irudi-modua .student-list li span:first-child { color: transparent; }
         body.irudi-modua .delete-btn { display: none; }
         body.irudi-modua .inner-btn { display: none !important; }
@@ -72,8 +71,7 @@
     
     <div class="actions">
         <button class="action-btn image-mode" onclick="toggleIrudiModua()">📷 Irudi Modua</button>
-        <button class="action-btn" onclick="gordeFitxategia()">💾 Esportatu (.json)</button>
-        <button class="action-btn load" onclick="kargatuFitxategia()">📂 Inportatu</button>
+        <button class="action-btn load" onclick="kargatuHodeitik()">🔄 Freskatu Datuak</button>
         <button class="action-btn pdf" onclick="esportatuPDF()">📄 Esportatu PDF</button>
         <button class="action-btn clear" onclick="garbituTaula(true)">🗑️ Garbitu Taula</button>
     </div>
@@ -100,6 +98,10 @@
     </table>
 
     <script>
+        // HODEIKO KONFIGURAZIOA (Jarri hemen zure JSONBin datuak)
+        const BIN_ID = '6aa162d3ffd5d16053f1d5ab'; 
+        const API_KEY = '$2a$10$PvHMO5jmc6Dq8/LbCaycOuIRhUojgbxcpsbpQYvkPfz2Ir2xdOGg2';
+
         const tbody = document.getElementById('tbody');
         const times = [];
         const egunak = ['Astelehena', 'Asteartea', 'Asteazkena', 'Osteguna', 'Ostirala'];
@@ -113,7 +115,6 @@
         }
         const totalRows = times.length;
 
-        // Taula eraiki
         for (let r = 0; r < totalRows; r++) {
             const tr = document.createElement('tr');
             const tdTime = document.createElement('td');
@@ -134,7 +135,6 @@
             tbody.appendChild(tr);
         }
 
-        // --- KOLOREAK EGUNERATZEKO FUNTZIOA ---
         function eguneratuKoloreak() {
             document.querySelectorAll('.active-class').forEach(cell => {
                 const ikasleKop = cell.querySelectorAll('.student-list li').length;
@@ -148,19 +148,17 @@
             });
         }
 
-        // --- IRUDI MODUA ---
         function toggleIrudiModua() {
             document.body.classList.toggle('irudi-modua');
         }
 
-        // --- AUTOGUARDADO ETA JSON FITXATEGIAK ---
-        function gordeDatuakLokalean() {
+        // --- HODEIKO GORDE ETA KARGATU FUNTZIOAK ---
+        async function gordeHodeian() {
             const klaseak = [];
             const aktiboak = document.querySelectorAll('.active-class');
             aktiboak.forEach(cell => {
                 const ikasleak = [];
-                const izenak = cell.querySelectorAll('.student-list li span:first-child');
-                izenak.forEach(span => ikasleak.push(span.textContent));
+                cell.querySelectorAll('.student-list li span:first-child').forEach(span => ikasleak.push(span.textContent));
                 klaseak.push({
                     row: cell.dataset.row,
                     day: cell.dataset.day,
@@ -168,64 +166,69 @@
                     ikasleak: ikasleak
                 });
             });
-            localStorage.setItem('onddi_ordutegia_data', JSON.stringify(klaseak));
-            
+
             const status = document.getElementById('auto-save-status');
-            const ordua = new Date().toLocaleTimeString();
-            status.textContent = `Aldaketak automatikoki gorde dira nabigatzailean (${ordua})`;
-            setTimeout(() => { status.textContent = ''; }, 3000);
-            
-            eguneratuKoloreak();
-        }
+            status.style.color = "#d69e2e";
+            status.textContent = "Hodeian gordetzen...";
 
-        async function lortuJsonFitxategia() {
             try {
-                // Karpetan bertan dagoen JSON fitxategia irakurtzen saiatzen da
-                const erantzuna = await fetch('onddi_ordutegia_2627.json');
-                if (!erantzuna.ok) throw new Error('Fitxategia ez da aurkitu');
-                return await erantzuna.json();
-            } catch (error) {
-                console.log("Ez da JSON fitxategia aurkitu karpetan, hutsik hasten da.");
-                return []; 
+                await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Master-Key': API_KEY
+                    },
+                    body: JSON.stringify(klaseak)
+                });
+                status.style.color = "#38a169";
+                status.textContent = "Aldaketak hodeian gorde dira!";
+            } catch (err) {
+                status.style.color = "#e53e3e";
+                status.textContent = "Errorea hodeian gordetzean.";
             }
+            setTimeout(() => { status.textContent = ''; }, 3000);
+            eguneratuKoloreak();
         }
 
-        async function kargatuDatuakLokalean() {
-            const datuakStr = localStorage.getItem('onddi_ordutegia_data');
-            let klaseakKargatzeko = [];
-            
-            if (datuakStr) {
-                try {
-                    klaseakKargatzeko = JSON.parse(datuakStr);
-                } catch(e) { 
-                    klaseakKargatzeko = await lortuJsonFitxategia();
-                }
-            } else {
-                // Memoriarik ez badago, karpetako JSON fitxategia bilatuko du automatikoki
-                klaseakKargatzeko = await lortuJsonFitxategia();
-            }
+        async function kargatuHodeitik() {
+            const status = document.getElementById('auto-save-status');
+            status.style.color = "#d69e2e";
+            status.textContent = "Hodeitik kargatzen...";
 
-            garbituTaula(false, false); 
-            klaseakKargatzeko.forEach(klase => {
-                const r = parseInt(klase.row);
-                const d = parseInt(klase.day);
-                const c = parseInt(klase.col);
-                const cell = tbody.querySelector(`td[data-row="${r}"][data-day="${d}"][data-col="${c}"]`);
-                if(cell && sortuKlasea(cell, r, d, c)) {
-                    const ul = cell.querySelector('.student-list');
-                    klase.ikasleak.forEach(izen => {
-                        const li = document.createElement('li');
-                        li.innerHTML = `<span>${izen}</span> <span class="delete-btn" title="Ikaslea ezabatu">×</span>`;
-                        ul.appendChild(li);
-                    });
-                }
-            });
-            
+            try {
+                const response = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+                    headers: { 'X-Master-Key': API_KEY }
+                });
+                if (!response.ok) throw new Error('Errorea');
+                const data = await response.json();
+                const klaseakKargatzeko = data.record || [];
+
+                garbituTaula(false, false); 
+                klaseakKargatzeko.forEach(klase => {
+                    const r = parseInt(klase.row);
+                    const d = parseInt(klase.day);
+                    const c = parseInt(klase.col);
+                    const cell = tbody.querySelector(`td[data-row="${r}"][data-day="${d}"][data-col="${c}"]`);
+                    if(cell && sortuKlasea(cell, r, d, c)) {
+                        const ul = cell.querySelector('.student-list');
+                        klase.ikasleak.forEach(izen => {
+                            const li = document.createElement('li');
+                            li.innerHTML = `<span>${izen}</span> <span class="delete-btn" title="Ikaslea ezabatu">×</span>`;
+                            ul.appendChild(li);
+                        });
+                    }
+                });
+                status.style.color = "#38a169";
+                status.textContent = "Datuak eguneratuta!";
+                setTimeout(() => { status.textContent = ''; }, 2000);
+            } catch (error) {
+                status.style.color = "#e53e3e";
+                status.textContent = "Errorea hodeitik kargatzean.";
+            }
             eguneratuKoloreak();
-            if (!datuakStr && klaseakKargatzeko.length > 0) gordeDatuakLokalean();
         }
         
-        window.addEventListener('DOMContentLoaded', kargatuDatuakLokalean);
+        window.addEventListener('DOMContentLoaded', kargatuHodeitik);
 
         // --- LOGIKA BIZIA ---
         function sortuKlasea(cell, r, d, c) {
@@ -275,7 +278,7 @@
             if (cell.classList.contains('active-class')) return;
 
             if(sortuKlasea(cell, parseInt(cell.dataset.row), parseInt(cell.dataset.day), parseInt(cell.dataset.col))) {
-                gordeDatuakLokalean();
+                gordeHodeian();
             }
         });
 
@@ -291,55 +294,21 @@
                     const li = document.createElement('li');
                     li.innerHTML = `<span>${name}</span> <span class="delete-btn" title="Ikaslea ezabatu">×</span>`;
                     ul.appendChild(li);
-                    gordeDatuakLokalean();
+                    gordeHodeian();
                 }
             }
             else if (e.target.classList.contains('delete-btn')) {
                 e.target.closest('li').remove();
-                gordeDatuakLokalean();
+                gordeHodeian();
             }
             else if (e.target.classList.contains('delete-class-btn')) {
                 if(confirm('Ziur zaude klase hau ezabatu nahi duzula?')) {
                     const cell = e.target.closest('td.cell');
                     kenduKlasea(cell, parseInt(cell.dataset.row), parseInt(cell.dataset.day), parseInt(cell.dataset.col));
-                    gordeDatuakLokalean();
+                    gordeHodeian();
                 }
             }
         });
-
-        // --- ESPORTATU ETA INPORTATU FITXATEGIAK ---
-        function gordeFitxategia() {
-            const datuak = localStorage.getItem('onddi_ordutegia_data') || '[]';
-            const blob = new Blob([datuak], { type: "application/json" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'onddi_ordutegia_2627.json';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function kargatuFitxategia() {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = '.json';
-            input.onchange = e => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = event => {
-                    try {
-                        localStorage.setItem('onddi_ordutegia_data', event.target.result);
-                        kargatuDatuakLokalean();
-                        alert('Fitxategia ondo kargatu da!');
-                    } catch (err) { alert('Errorea: Fitxategia ez da baliozkoa.'); }
-                };
-                reader.readAsText(file);
-            };
-            input.click();
-        }
 
         function garbituTaula(abisuarekin, gorde = true) {
             if (abisuarekin && !confirm('Ziur zaude taula osoa garbitu nahi duzula?')) return;
@@ -347,11 +316,7 @@
             aktiboak.forEach(cell => {
                 kenduKlasea(cell, parseInt(cell.dataset.row), parseInt(cell.dataset.day), parseInt(cell.dataset.col));
             });
-            if (abisuarekin) {
-                localStorage.setItem('onddi_ordutegia_data', '[]');
-            } else if (gorde) {
-                gordeDatuakLokalean();
-            }
+            if (gorde) gordeHodeian();
         }
 
         // --- PDF ESPORTAZIOA ---
