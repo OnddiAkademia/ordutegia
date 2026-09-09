@@ -59,8 +59,8 @@
             text-align: center; font-size: 0.85em; color: #718096; margin-top: -10px; margin-bottom: 15px; height: 15px;
         }
 
-        /* IRUDI MODUA (Pantaila-argazkia ateratzeko) */
-        body.irudi-modua .student-list li span:first-child { color: transparent; } /* Izenak ezkutatu */
+        /* IRUDI MODUA */
+        body.irudi-modua .student-list li span:first-child { color: transparent; }
         body.irudi-modua .delete-btn { display: none; }
         body.irudi-modua .inner-btn { display: none !important; }
     </style>
@@ -103,42 +103,6 @@
         const tbody = document.getElementById('tbody');
         const times = [];
         const egunak = ['Astelehena', 'Asteartea', 'Asteazkena', 'Osteguna', 'Ostirala'];
-        
-        // Ordutegi lehenetsia (JSON eguneratua)
-        const defaultDatuak = [
-            {"row":"0","day":"2","col":"0","ikasleak":["Adibidea"]},
-            {"row":"0","day":"4","col":"0","ikasleak":["Naroa Ascension"]},
-            {"row":"1","day":"0","col":"0","ikasleak":["Urko Ortega"]},
-            {"row":"1","day":"1","col":"0","ikasleak":["Jaitz Zubillaga","Ximon Garin"]},
-            {"row":"1","day":"3","col":"0","ikasleak":["Inhar Iruretagoyena","Xare Peñagarikano","Anika","Jaitz Zubillaga"]},
-            {"row":"3","day":"0","col":"1","ikasleak":["Markel Rodriguez","Izaro Arnaiz","Ixabel Garin"]},
-            {"row":"3","day":"1","col":"1","ikasleak":["Izaro Arnaiz","Maialen Aizpurua"]},
-            {"row":"3","day":"2","col":"1","ikasleak":["Adibidea"]},
-            {"row":"3","day":"3","col":"1","ikasleak":["Izaro Arnaiz","June"]},
-            {"row":"3","day":"4","col":"1","ikasleak":["Irene Cortés"]},
-            {"row":"6","day":"2","col":"0","ikasleak":["Julen Torres","Xuban Morras","Hegoa Balda","Maren Goñi"]},
-            {"row":"6","day":"4","col":"0","ikasleak":["Adibidea"]},
-            {"row":"7","day":"0","col":"0","ikasleak":["Nahia Altuna","Hegoa Balda","Maren Goñi"]},
-            {"row":"7","day":"0","col":"1","ikasleak":["Ibai Lamuedra","Izan Vicente"]},
-            {"row":"7","day":"1","col":"0","ikasleak":["Xuban Morras"]},
-            {"row":"7","day":"1","col":"1","ikasleak":["Lur Rodriguez","Ibai López"]},
-            {"row":"7","day":"2","col":"1","ikasleak":["Iñigo Manso","Izan Vicente"]},
-            {"row":"7","day":"3","col":"0","ikasleak":["Yaiza Rosco","Iraia Herrero"]},
-            {"row":"7","day":"3","col":"1","ikasleak":["Ibai López"]},
-            {"row":"7","day":"4","col":"1","ikasleak":["Adibidea"]},
-            {"row":"11","day":"0","col":"1","ikasleak":["Unai Etxabe"]},
-            {"row":"11","day":"1","col":"1","ikasleak":["Adibidea"]},
-            {"row":"11","day":"2","col":"1","ikasleak":["Unai Etxabe"]},
-            {"row":"11","day":"3","col":"1","ikasleak":["Adibidea"]},
-            {"row":"12","day":"2","col":"0","ikasleak":["Adibidea","Adibidea","Adibidea","Adibidea"]},
-            {"row":"13","day":"0","col":"0","ikasleak":["Yaiza Rosco","Iraia Herrero"]},
-            {"row":"13","day":"1","col":"0","ikasleak":["Naroa Ascension","Nahia Uria"]},
-            {"row":"13","day":"3","col":"0","ikasleak":["Julen Torres","Nahia Uria"]},
-            {"row":"15","day":"0","col":"1","ikasleak":["Irene Cortés"]},
-            {"row":"15","day":"1","col":"1","ikasleak":["Adibidea"]},
-            {"row":"15","day":"2","col":"1","ikasleak":["Irene Cortés"]},
-            {"row":"15","day":"3","col":"1","ikasleak":["Adibidea"]}
-        ];
         
         let h = 15, m = 15;
         while(h < 20) {
@@ -189,7 +153,7 @@
             document.body.classList.toggle('irudi-modua');
         }
 
-        // --- AUTOGUARDADO ---
+        // --- AUTOGUARDADO ETA JSON FITXATEGIAK ---
         function gordeDatuakLokalean() {
             const klaseak = [];
             const aktiboak = document.querySelectorAll('.active-class');
@@ -214,7 +178,19 @@
             eguneratuKoloreak();
         }
 
-        function kargatuDatuakLokalean() {
+        async function lortuJsonFitxategia() {
+            try {
+                // Karpetan bertan dagoen JSON fitxategia irakurtzen saiatzen da
+                const erantzuna = await fetch('onddi_ordutegia_2627.json');
+                if (!erantzuna.ok) throw new Error('Fitxategia ez da aurkitu');
+                return await erantzuna.json();
+            } catch (error) {
+                console.log("Ez da JSON fitxategia aurkitu karpetan, hutsik hasten da.");
+                return []; 
+            }
+        }
+
+        async function kargatuDatuakLokalean() {
             const datuakStr = localStorage.getItem('onddi_ordutegia_data');
             let klaseakKargatzeko = [];
             
@@ -222,10 +198,11 @@
                 try {
                     klaseakKargatzeko = JSON.parse(datuakStr);
                 } catch(e) { 
-                    klaseakKargatzeko = defaultDatuak;
+                    klaseakKargatzeko = await lortuJsonFitxategia();
                 }
             } else {
-                klaseakKargatzeko = defaultDatuak;
+                // Memoriarik ez badago, karpetako JSON fitxategia bilatuko du automatikoki
+                klaseakKargatzeko = await lortuJsonFitxategia();
             }
 
             garbituTaula(false, false); 
@@ -245,8 +222,7 @@
             });
             
             eguneratuKoloreak();
-            // Inportantea: Lokalean ezer ez badago, kargatutako datu lehenetsiak automatikoki gorde
-            if (!datuakStr) gordeDatuakLokalean();
+            if (!datuakStr && klaseakKargatzeko.length > 0) gordeDatuakLokalean();
         }
         
         window.addEventListener('DOMContentLoaded', kargatuDatuakLokalean);
@@ -366,13 +342,12 @@
         }
 
         function garbituTaula(abisuarekin, gorde = true) {
-            if (abisuarekin && !confirm('Ziur zaude taula osoa garbitu nahi duzula? Aldaketak ezin dira desegin.')) return;
+            if (abisuarekin && !confirm('Ziur zaude taula osoa garbitu nahi duzula?')) return;
             const aktiboak = document.querySelectorAll('.active-class');
             aktiboak.forEach(cell => {
                 kenduKlasea(cell, parseInt(cell.dataset.row), parseInt(cell.dataset.day), parseInt(cell.dataset.col));
             });
             if (abisuarekin) {
-                // Taula eskuz garbitzen bada, lokalean ere garbitu behar da (hutsik gorde)
                 localStorage.setItem('onddi_ordutegia_data', '[]');
             } else if (gorde) {
                 gordeDatuakLokalean();
