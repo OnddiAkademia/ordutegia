@@ -364,9 +364,7 @@
             taulaKlonatua.style.borderCollapse = 'collapse';
             taulaKlonatua.style.fontSize = '12px';
             
-            // Ziurtatu PDF-an zutabe guztiak agertzen direla (iragazkia kentzen zaio klonari)
             taulaKlonatua.classList.remove('solo-1h30', 'solo-1h');
-            taulaKlonatua.querySelectorAll('thead tr:first-child th[colspan]').th ? null : '';
             taulaKlonatua.querySelectorAll('thead tr:first-child th[colspan]').forEach(th => th.colSpan = 2);
 
             taulaKlonatua.querySelectorAll('th, td').forEach(el => {
@@ -386,11 +384,15 @@
             });
             kontainerra.appendChild(taulaKlonatua);
 
+            // --- CAMBIO CLAVE 1: Crear un contenedor para la lista que fuerce una página nueva ---
+            const listaContenedor = document.createElement('div');
+            listaContenedor.style.pageBreakBefore = 'always'; 
+
             const ikasleIzenburua = document.createElement('h3');
             ikasleIzenburua.textContent = 'Ikasleen Zerrenda (Ordu kopuruaren arabera ordenatuta)';
-            ikasleIzenburua.style.marginTop = '30px'; ikasleIzenburua.style.borderBottom = '1px solid #ccc';
+            ikasleIzenburua.style.borderBottom = '1px solid #ccc';
             ikasleIzenburua.style.paddingBottom = '5px';
-            kontainerra.appendChild(ikasleIzenburua);
+            listaContenedor.appendChild(ikasleIzenburua);
 
             let ikasleDatuak = {}; 
             const aktiboak = document.querySelectorAll('.active-class');
@@ -429,11 +431,19 @@
                     ulList.appendChild(li);
                 });
             }
-            kontainerra.appendChild(ulList);
+            
+            // Adjuntamos la lista a su contenedor y el contenedor al documento principal
+            listaContenedor.appendChild(ulList);
+            kontainerra.appendChild(listaContenedor);
 
+            // --- CAMBIO CLAVE 2: Activar el soporte para saltos de página (pagebreak) ---
             html2pdf().set({
-              margin: 10, filename: 'onddi_ordutegia_2627.pdf', image: { type: 'jpeg', quality: 0.98 },
-              html2canvas: { scale: 2 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' }
+              margin: 10, 
+              filename: 'onddi_ordutegia_2627.pdf', 
+              image: { type: 'jpeg', quality: 0.98 },
+              html2canvas: { scale: 2 }, 
+              jsPDF: { unit: 'mm', format: 'a4', orientation: 'landscape' },
+              pagebreak: { mode: ['css', 'legacy'] } 
             }).from(kontainerra).save();
         }
     </script>
